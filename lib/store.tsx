@@ -106,6 +106,46 @@ export interface Profile {
   refId?: string;
 }
 
+export interface Territory {
+  id: string;
+  name: string;
+  areaCode: string;
+  assignedRepId: string;
+}
+
+export interface RouteStop {
+  id: string;
+  customerId: string;
+  customerName: string;
+  visitOrder: number;
+  status: "Pending" | "Checked-In" | "Checked-Out" | "Completed" | "Missed";
+  checkInTime?: string;
+  checkOutTime?: string;
+  visitNotes?: string;
+  photoUrl?: string;
+  salesGenerated?: number;
+  distanceToNext?: number; // km
+  durationToNext?: number; // minutes
+}
+
+export interface Route {
+  id: string;
+  salesPersonId: string;
+  salesPersonName: string;
+  date: string; // YYYY-MM-DD
+  stops: RouteStop[];
+  status: "Planned" | "In-Progress" | "Completed" | "Cancelled";
+  currentStopIndex: number;
+  totalDistance?: number;
+  totalDuration?: number;
+  recurringType?: "none" | "weekly" | "monthly";
+  recurringDay?: number; // 0-6 for weekly (0=Sun), 1-31 for monthly
+  isTemplate?: boolean;
+  templateName?: string;
+  checkInGps?: { lat: number; lng: number };
+  checkOutGps?: { lat: number; lng: number };
+}
+
 interface AppContextType {
   customers: Customer[];
   inventory: InventoryItem[];
@@ -124,7 +164,27 @@ interface AppContextType {
   currentProfile: Profile;
   setCurrentProfile: (profile: Profile) => void;
   availableProfiles: Profile[];
+
+  // Routes & Territories State
+  routes: Route[];
+  territories: Territory[];
+  routeTemplates: Route[];
+
+  // Routes & Territories Actions
+  addRoute: (route: Omit<Route, "id">) => void;
+  updateRouteStop: (routeId: string, stopId: string, updates: Partial<RouteStop>) => void;
+  checkInStop: (routeId: string, stopId: string, gps: { lat: number; lng: number }) => void;
+  checkOutStop: (routeId: string, stopId: string, notes: string, photoUrl: string, salesGenerated: number, gps: { lat: number; lng: number }) => void;
+  optimizeRouteStops: (routeId: string) => void;
+  reassignRoute: (routeId: string, newRepId: string) => void;
+  saveRouteTemplate: (routeId: string, templateName: string) => void;
+  loadRouteTemplate: (templateId: string, date: string, repId: string) => void;
+  addTerritory: (name: string, areaCode: string) => void;
+  assignTerritory: (territoryId: string, repId: string) => void;
+  addCustomer: (customer: Omit<Customer, "id" | "currentBalance" | "riskScore" | "loyaltyScore" | "churnProbability">) => void;
+  addInventoryItem: (item: Omit<InventoryItem, "id">) => void;
 }
+
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -207,8 +267,128 @@ export const availableProfiles: Profile[] = [
   { id: "driver_pradeep", name: "Pradeep Perera", role: "Logistics Driver", initials: "PP", type: "driver" }
 ];
 
+const initialTerritories: Territory[] = [
+  { id: "t1", name: "Colombo Central", areaCode: "Colombo 01-05", assignedRepId: "manoj" },
+  { id: "t2", name: "Negombo Coast", areaCode: "Negombo", assignedRepId: "nishan" },
+  { id: "t3", name: "Gampaha District", areaCode: "Gampaha", assignedRepId: "priyanga" },
+  { id: "t4", name: "Kandy Hub", areaCode: "Kandy", assignedRepId: "manoj" }
+];
+
+const initialRoutes = (todayStr: string): Route[] => [
+  {
+    id: "r1",
+    salesPersonId: "manoj",
+    salesPersonName: "Manoj De Silva",
+    date: todayStr,
+    status: "In-Progress",
+    currentStopIndex: 1,
+    totalDistance: 15.2,
+    totalDuration: 45,
+    stops: [
+      {
+        id: "s1_1",
+        customerId: "c1",
+        customerName: "Apex Hardware Distributors",
+        visitOrder: 1,
+        status: "Completed",
+        checkInTime: "09:15 AM",
+        checkOutTime: "09:45 AM",
+        visitNotes: "Stock levels checked. Ordered 50 valves and 100 elbows.",
+        salesGenerated: 1035.0
+      },
+      {
+        id: "s1_2",
+        customerId: "c5",
+        customerName: "Metro Fittings Colombo",
+        visitOrder: 2,
+        status: "Checked-In",
+        checkInTime: "10:10 AM"
+      },
+      {
+        id: "s1_3",
+        customerId: "c2",
+        customerName: "Lanka Brass Emporium",
+        visitOrder: 3,
+        status: "Pending"
+      }
+    ]
+  },
+  {
+    id: "r2",
+    salesPersonId: "nishan",
+    salesPersonName: "Nishan Alwis",
+    date: todayStr,
+    status: "Planned",
+    currentStopIndex: 0,
+    totalDistance: 24.5,
+    totalDuration: 75,
+    stops: [
+      {
+        id: "s2_1",
+        customerId: "c4",
+        customerName: "Southern Builders Depot",
+        visitOrder: 1,
+        status: "Pending"
+      }
+    ]
+  },
+  {
+    id: "r3",
+    salesPersonId: "priyanga",
+    salesPersonName: "Priyanga Silva",
+    date: todayStr,
+    status: "Completed",
+    currentStopIndex: 0,
+    totalDistance: 8.4,
+    totalDuration: 25,
+    stops: [
+      {
+        id: "s3_1",
+        customerId: "c3",
+        customerName: "Kandy Industrial Supplies",
+        visitOrder: 1,
+        status: "Completed",
+        checkInTime: "08:30 AM",
+        checkOutTime: "08:55 AM",
+        visitNotes: "Client reported strong demand for heavy duty taps. Payment collected.",
+        salesGenerated: 232.0
+      }
+    ]
+  }
+];
+
+const initialTemplates: Route[] = [
+  {
+    id: "tmpl_colombo",
+    salesPersonId: "manoj",
+    salesPersonName: "Manoj De Silva",
+    date: "",
+    status: "Planned",
+    currentStopIndex: 0,
+    isTemplate: true,
+    templateName: "Colombo Weekly Route",
+    stops: [
+      { id: "s_t1", customerId: "c1", customerName: "Apex Hardware Distributors", visitOrder: 1, status: "Pending" },
+      { id: "s_t2", customerId: "c5", customerName: "Metro Fittings Colombo", visitOrder: 2, status: "Pending" }
+    ]
+  },
+  {
+    id: "tmpl_kandy",
+    salesPersonId: "priyanga",
+    salesPersonName: "Priyanga Silva",
+    date: "",
+    status: "Planned",
+    currentStopIndex: 0,
+    isTemplate: true,
+    templateName: "Kandy Bi-weekly Route",
+    stops: [
+      { id: "s_t3", customerId: "c3", customerName: "Kandy Industrial Supplies", visitOrder: 1, status: "Pending" }
+    ]
+  }
+];
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentTab, setCurrentTab] = useState("dashboard");
+  const [currentTab, setCurrentTab] = useState("simple-dashboard");
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
@@ -218,31 +398,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
 
+  // Routes & Territories State
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [territories, setTerritories] = useState<Territory[]>(initialTerritories);
+  const [routeTemplates, setRouteTemplates] = useState<Route[]>(initialTemplates);
+
   // Sync state between tabs and updates (in-memory simulator triggers updates)
   useEffect(() => {
+    const todayStr = new Date().toISOString().split("T")[0];
     const saved = localStorage.getItem("ruwan_brass_edos_state");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setCustomers(parsed.customers);
-        setInventory(parsed.inventory);
-        setOrders(parsed.orders);
-        setInvoices(parsed.invoices);
-        setDeliveries(parsed.deliveries);
-        setCommissions(parsed.commissions);
-        setAlerts(parsed.alerts);
+        setCustomers(parsed.customers || initialCustomers);
+        setInventory(parsed.inventory || initialInventory);
+        setOrders(parsed.orders || initialOrders);
+        setInvoices(parsed.invoices || initialInvoices);
+        setDeliveries(parsed.deliveries || initialDeliveries);
+        setCommissions(parsed.commissions || initialCommissions);
+        setAlerts(parsed.alerts || initialAlerts);
         if (parsed.currentProfile) {
           setCurrentProfile(parsed.currentProfile);
+        }
+        if (parsed.routes) {
+          setRoutes(parsed.routes);
+        } else {
+          setRoutes(initialRoutes(todayStr));
+        }
+        if (parsed.territories) {
+          setTerritories(parsed.territories);
+        }
+        if (parsed.routeTemplates) {
+          setRouteTemplates(parsed.routeTemplates);
         }
       } catch (e) {
         console.error("Error loading state", e);
       }
+    } else {
+      setRoutes(initialRoutes(todayStr));
     }
   }, []);
 
   const saveState = (updatedState: any) => {
-    localStorage.setItem("ruwan_brass_edos_state", JSON.stringify(updatedState));
+    let existing = {};
+    try {
+      const saved = localStorage.getItem("ruwan_brass_edos_state");
+      if (saved) {
+        existing = JSON.parse(saved);
+      }
+    } catch (e) {}
+
+    localStorage.setItem(
+      "ruwan_brass_edos_state",
+      JSON.stringify({
+        ...existing,
+        ...updatedState
+      })
+    );
   };
+
 
   const addOrder = (
     customerId: string,
@@ -546,6 +760,287 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
+  const addRoute = (routeData: Omit<Route, "id">) => {
+    const newRoute: Route = {
+      ...routeData,
+      id: `route-${Date.now()}`
+    };
+    const nextRoutes = [newRoute, ...routes];
+    setRoutes(nextRoutes);
+    saveState({ routes: nextRoutes });
+  };
+
+  const updateRouteStop = (routeId: string, stopId: string, updates: Partial<RouteStop>) => {
+    const nextRoutes = routes.map(r => {
+      if (r.id === routeId) {
+        const nextStops = r.stops.map(s => {
+          if (s.id === stopId) {
+            return { ...s, ...updates };
+          }
+          return s;
+        });
+        return { ...r, stops: nextStops };
+      }
+      return r;
+    });
+    setRoutes(nextRoutes);
+    saveState({ routes: nextRoutes });
+  };
+
+  const checkInStop = (routeId: string, stopId: string, gps: { lat: number; lng: number }) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nextRoutes = routes.map(r => {
+      if (r.id === routeId) {
+        const nextStops = r.stops.map(s => {
+          if (s.id === stopId) {
+            return { ...s, status: "Checked-In" as const, checkInTime: timeStr };
+          }
+          return s;
+        });
+        return { 
+          ...r, 
+          stops: nextStops, 
+          status: "In-Progress" as const,
+          checkInGps: gps
+        };
+      }
+      return r;
+    });
+    setRoutes(nextRoutes);
+    saveState({ routes: nextRoutes });
+  };
+
+  const checkOutStop = (routeId: string, stopId: string, notes: string, photoUrl: string, salesGenerated: number, gps: { lat: number; lng: number }) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nextRoutes = routes.map(r => {
+      if (r.id === routeId) {
+        const nextStops = r.stops.map(s => {
+          if (s.id === stopId) {
+            return { 
+              ...s, 
+              status: "Completed" as const, 
+              checkOutTime: timeStr, 
+              visitNotes: notes, 
+              photoUrl, 
+              salesGenerated 
+            };
+          }
+          return s;
+        });
+        
+        const allDone = nextStops.every(s => s.status === "Completed" || s.status === "Missed");
+        const currentStopIndex = r.currentStopIndex + 1;
+        
+        return {
+          ...r,
+          stops: nextStops,
+          status: (allDone ? "Completed" : r.status) as any,
+          currentStopIndex: Math.min(currentStopIndex, nextStops.length - 1),
+          checkOutGps: gps
+        };
+      }
+      return r;
+    });
+    
+    setRoutes(nextRoutes);
+    
+    const targetRoute = routes.find(r => r.id === routeId);
+    const targetStop = targetRoute?.stops.find(s => s.id === stopId);
+    if (targetRoute && targetStop) {
+      const alertMsg = `Visit Complete: ${targetRoute.salesPersonName} completed stop at ${targetStop.customerName}. Generated LKR ${salesGenerated.toLocaleString()}`;
+      const newAlerts = [
+        {
+          id: `al-${Date.now()}`,
+          type: "system" as const,
+          message: alertMsg,
+          severity: "info" as const,
+          time: "Just now",
+          isCleared: false
+        },
+        ...alerts
+      ];
+      setAlerts(newAlerts);
+      saveState({ alerts: newAlerts, routes: nextRoutes });
+    } else {
+      saveState({ routes: nextRoutes });
+    }
+  };
+
+  const optimizeRouteStops = (routeId: string) => {
+    const nextRoutes = routes.map(r => {
+      if (r.id === routeId) {
+        const stopsCopy = [...r.stops];
+        let currentLoc = { lat: 6.9271, lng: 79.8612 };
+        const optimized: typeof r.stops = [];
+        
+        while (stopsCopy.length > 0) {
+          let closestIndex = 0;
+          let minDistance = Infinity;
+          
+          for (let i = 0; i < stopsCopy.length; i++) {
+            const customer = customers.find(c => c.id === stopsCopy[i].customerId);
+            if (customer) {
+              const dist = Math.sqrt(
+                Math.pow(currentLoc.lat - customer.gps.lat, 2) + 
+                Math.pow(currentLoc.lng - customer.gps.lng, 2)
+              );
+              if (dist < minDistance) {
+                minDistance = dist;
+                closestIndex = i;
+              }
+            }
+          }
+          
+          const nextStop = stopsCopy.splice(closestIndex, 1)[0];
+          const customer = customers.find(c => c.id === nextStop.customerId);
+          if (customer) {
+            currentLoc = customer.gps;
+          }
+          optimized.push(nextStop);
+        }
+        
+        const stopsWithOrder = optimized.map((s, idx) => ({
+          ...s,
+          visitOrder: idx + 1,
+          distanceToNext: idx < optimized.length - 1 ? Math.floor(5 + Math.random() * 20) : undefined,
+          durationToNext: idx < optimized.length - 1 ? Math.floor(10 + Math.random() * 30) : undefined
+        }));
+        
+        const totalDist = stopsWithOrder.reduce((sum, s) => sum + (s.distanceToNext || 0), 0) + 5;
+        const totalDur = stopsWithOrder.reduce((sum, s) => sum + (s.durationToNext || 0), 0) + 15;
+        
+        return {
+          ...r,
+          stops: stopsWithOrder,
+          totalDistance: Number(totalDist.toFixed(1)),
+          totalDuration: totalDur
+        };
+      }
+      return r;
+    });
+    
+    setRoutes(nextRoutes);
+    saveState({ routes: nextRoutes });
+  };
+
+  const reassignRoute = (routeId: string, newRepId: string) => {
+    const repProfile = availableProfiles.find(p => p.id === newRepId);
+    if (!repProfile) return;
+    
+    const nextRoutes = routes.map(r => {
+      if (r.id === routeId) {
+        return {
+          ...r,
+          salesPersonId: newRepId,
+          salesPersonName: repProfile.name
+        };
+      }
+      return r;
+    });
+    setRoutes(nextRoutes);
+    saveState({ routes: nextRoutes });
+  };
+
+  const saveRouteTemplate = (routeId: string, templateName: string) => {
+    const route = routes.find(r => r.id === routeId);
+    if (!route) return;
+    
+    const newTemplate: Route = {
+      ...route,
+      id: `tmpl-${Date.now()}`,
+      isTemplate: true,
+      templateName,
+      date: "",
+      status: "Planned",
+      stops: route.stops.map(s => ({
+        ...s,
+        status: "Pending",
+        checkInTime: undefined,
+        checkOutTime: undefined,
+        visitNotes: undefined,
+        photoUrl: undefined,
+        salesGenerated: undefined
+      }))
+    };
+    
+    const nextTemplates = [newTemplate, ...routeTemplates];
+    setRouteTemplates(nextTemplates);
+    saveState({ routeTemplates: nextTemplates });
+  };
+
+  const loadRouteTemplate = (templateId: string, date: string, repId: string) => {
+    const template = routeTemplates.find(t => t.id === templateId);
+    const repProfile = availableProfiles.find(p => p.id === repId);
+    if (!template || !repProfile) return;
+    
+    const newRoute: Route = {
+      ...template,
+      id: `route-${Date.now()}`,
+      isTemplate: false,
+      templateName: undefined,
+      date,
+      salesPersonId: repId,
+      salesPersonName: repProfile.name,
+      status: "Planned",
+      stops: template.stops.map((s, idx) => ({
+        ...s,
+        id: `s-${Date.now()}-${idx}`,
+        status: "Pending"
+      }))
+    };
+    
+    const nextRoutes = [newRoute, ...routes];
+    setRoutes(nextRoutes);
+    saveState({ routes: nextRoutes });
+  };
+
+  const addTerritory = (name: string, areaCode: string) => {
+    const newTerritory: Territory = {
+      id: `t-${Date.now()}`,
+      name,
+      areaCode,
+      assignedRepId: ""
+    };
+    const nextTerritories = [...territories, newTerritory];
+    setTerritories(nextTerritories);
+    saveState({ territories: nextTerritories });
+  };
+
+  const assignTerritory = (territoryId: string, repId: string) => {
+    const nextTerritories = territories.map(t => {
+      if (t.id === territoryId) {
+        return { ...t, assignedRepId: repId };
+      }
+      return t;
+    });
+    setTerritories(nextTerritories);
+    saveState({ territories: nextTerritories });
+  };
+
+  const addCustomer = (customerData: Omit<Customer, "id" | "currentBalance" | "riskScore" | "loyaltyScore" | "churnProbability">) => {
+    const newCustomer: Customer = {
+      ...customerData,
+      id: `c${customers.length + 1}`,
+      currentBalance: 0,
+      riskScore: Math.floor(5 + Math.random() * 25),
+      loyaltyScore: 100,
+      churnProbability: 0.5
+    };
+    const nextCustomers = [...customers, newCustomer];
+    setCustomers(nextCustomers);
+    saveState({ customers: nextCustomers });
+  };
+
+  const addInventoryItem = (itemData: Omit<InventoryItem, "id">) => {
+    const newItem: InventoryItem = {
+      ...itemData,
+      id: `i${inventory.length + 1}`
+    };
+    const nextInventory = [...inventory, newItem];
+    setInventory(nextInventory);
+    saveState({ inventory: nextInventory });
+  };
+
   const resetState = () => {
     localStorage.removeItem("ruwan_brass_edos_state");
     setCustomers(initialCustomers);
@@ -556,7 +1051,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCommissions(initialCommissions);
     setAlerts(initialAlerts);
     setCurrentProfile(initialProfile);
-    setCurrentTab("dashboard");
+    setCurrentTab("simple-dashboard");
+    setRoutes(initialRoutes(new Date().toISOString().split("T")[0]));
+    setTerritories(initialTerritories);
+    setRouteTemplates(initialTemplates);
   };
 
   return (
@@ -578,7 +1076,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentTab,
         currentProfile,
         setCurrentProfile: handleSetProfile,
-        availableProfiles
+        availableProfiles,
+        
+        // Routes & Territories State
+        routes,
+        territories,
+        routeTemplates,
+
+        // Routes & Territories Actions
+        addRoute,
+        updateRouteStop,
+        checkInStop,
+        checkOutStop,
+        optimizeRouteStops,
+        reassignRoute,
+        saveRouteTemplate,
+        loadRouteTemplate,
+        addTerritory,
+        assignTerritory,
+        addCustomer,
+        addInventoryItem
       }}
     >
       {children}

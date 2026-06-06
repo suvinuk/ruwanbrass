@@ -2,17 +2,20 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useAppState } from "../lib/store";
+import { QuickWorkCenter } from "../components/modules/quick-work-center";
 import { CommandCenter } from "../components/modules/command-center";
 import { SalesCredit } from "../components/modules/sales-credit";
 import { Inventory } from "../components/modules/inventory";
 import { FleetLogistics } from "../components/modules/fleet-logistics";
+import { RouteManager } from "../components/modules/route-manager";
 import { CommissionEngine } from "../components/modules/commission-engine";
 import { SuperSearch } from "../components/ui/super-search";
 
 import { 
   LayoutDashboard, ShoppingBag, Package, Truck, Percent, Search, 
   Sparkles, Bell, Clock, ChevronDown, Check, LogOut, Menu, X,
-  AlertTriangle, AlertCircle, Info, Trash2, Bot, Zap, BrainCircuit
+  AlertTriangle, AlertCircle, Info, Trash2, Bot, Zap, BrainCircuit,
+  LayoutGrid, Map
 } from "lucide-react";
 
 export default function WorkspaceHome() {
@@ -91,15 +94,19 @@ export default function WorkspaceHome() {
   };
 
   const navItems = [
+    { id: "simple-dashboard", label: "Quick Work Center", icon: LayoutGrid },
     { id: "dashboard", label: "Command Center", icon: LayoutDashboard },
     { id: "sales", label: "Sales & Credit", icon: ShoppingBag },
     { id: "inventory", label: "Inventory Lines", icon: Package },
     { id: "fleet", label: "Fleet Logistics", icon: Truck },
+    { id: "routes", label: "Sales Routes", icon: Map, hideFor: ["shop", "driver"] },
     { id: "commissions", label: "Commission Engine", icon: Percent, hideFor: ["shop", "driver"] },
   ].filter(item => !item.hideFor?.includes(currentProfile.type));
 
   const renderActiveTab = () => {
     switch (currentTab) {
+      case "simple-dashboard":
+        return <QuickWorkCenter setSearchOpen={setSearchOpen} />;
       case "dashboard":
         return <CommandCenter />;
       case "sales":
@@ -108,10 +115,12 @@ export default function WorkspaceHome() {
         return <Inventory />;
       case "fleet":
         return <FleetLogistics />;
+      case "routes":
+        return <RouteManager />;
       case "commissions":
         return <CommissionEngine />;
       default:
-        return <CommandCenter />;
+        return <QuickWorkCenter setSearchOpen={setSearchOpen} />;
     }
   };
 
