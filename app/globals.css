@@ -1,0 +1,208 @@
+@import "tailwindcss";
+
+:root {
+  --background: #030303;
+  --foreground: #f4f4f5;
+  --accent-brass: #d97706;
+  --accent-brass-glow: rgba(217, 119, 6, 0.15);
+  --glass-bg: rgba(9, 9, 11, 0.7);
+  --glass-border: rgba(39, 39, 42, 0.6);
+  --card-border: rgba(39, 39, 42, 0.4);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brass: var(--accent-brass);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Custom base resets and global styling */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), sans-serif;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism card utilities */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+.glass-panel-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel-hover:hover {
+  border-color: rgba(217, 119, 6, 0.35);
+  box-shadow: 0 8px 30px rgba(217, 119, 6, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Custom premium scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-brass);
+}
+
+/* Custom animation utility for ambient glow pulse */
+@keyframes ambient-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+.animate-ambient {
+  animation: ambient-glow 8s infinite alternate ease-in-out;
+}
+
+/* Grid overlay background */
+.grid-bg {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(39, 39, 42, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(39, 39, 42, 0.15) 1px, transparent 1px);
+}
+
+/* Print Styles */
+@media print {
+  /* Hide all interactive and layout chrome */
+  aside,
+  header,
+  button,
+  form,
+  .no-print,
+  nav,
+  input,
+  select,
+  .mobile-menu-open,
+  [role="dialog"] {
+    display: none !important;
+  }
+  
+  /* Reset body and core tags for clean printing */
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  main {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  /* Force background colors to transparent/white and reset borders */
+  .bg-zinc-950\/40,
+  .bg-zinc-900\/20,
+  .bg-zinc-950\/20,
+  .bg-zinc-900\/30,
+  .bg-zinc-900\/60,
+  .bg-zinc-900,
+  .bg-zinc-800,
+  .bg-zinc-800\/50,
+  .bg-zinc-950 {
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: #e4e4e7 !important;
+    box-shadow: none !important;
+  }
+
+  /* Text color corrections (convert light text to dark text) */
+  h1, h2, h3, h4, h5, h6,
+  p, span, td, th, div, tr {
+    color: #000000 !important;
+    text-shadow: none !important;
+  }
+
+  .text-zinc-100, .text-zinc-200, .text-zinc-300, .text-zinc-400, .text-zinc-500, .text-zinc-600, .text-zinc-700 {
+    color: #18181b !important;
+  }
+
+  .text-amber-500, .text-indigo-400, .text-rose-500, .text-emerald-500, .text-emerald-400, .text-rose-300, .text-amber-300 {
+    color: #000000 !important;
+    font-weight: bold !important;
+  }
+
+  /* Borders for structure */
+  .border,
+  .border-b,
+  .border-t,
+  .border-r,
+  .border-l,
+  .border-zinc-800,
+  .border-zinc-700 {
+    border-color: #d4d4d8 !important;
+  }
+
+  /* layout columns adjustment for printing */
+  .grid {
+    display: block !important;
+  }
+
+  .grid > div {
+    margin-bottom: 2rem !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Clean up tables */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  th, td {
+    border-bottom: 1px solid #d4d4d8 !important;
+    padding: 8px 12px !important;
+    color: #000000 !important;
+    background: transparent !important;
+  }
+
+  /* Remove absolute glow overlays and dynamic visual widgets */
+  .animate-ambient,
+  .animate-pulse,
+  .animate-bounce,
+  .animate-ping,
+  div[class*="blur-"] {
+    display: none !important;
+  }
+}
